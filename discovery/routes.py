@@ -2,20 +2,21 @@ import logging
 import time
 import hashlib
 import json
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Depends
 
 from discovery.schemas import DiscoveryRequest, DiscoveryResponse, DiscoveredPaper
 from discovery.client import search_arxiv
 from langfuse.decorators import observe, langfuse_context
 from db.models import get_session, DiscoveryCacheRecord
 from observability.security import check_prompt_injection
+from auth.jwt import get_current_user, User
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
 
 @router.post("/discover", response_model=DiscoveryResponse)
 @observe(as_type="trace")
-def discover_literature(request: DiscoveryRequest):
+def discover_literature(request: DiscoveryRequest, user: User = Depends(get_current_user)):
     """Discover scientific literature using ArXiv API."""
     start_time = time.time()
     langfuse_context.update_current_trace(name="discover", input={"query": request.query, "limit": request.limit})
