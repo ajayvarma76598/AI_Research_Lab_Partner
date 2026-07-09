@@ -35,6 +35,9 @@ def search_arxiv(query: str, limit: int = 10) -> List[DiscoveredPaper]:
             for author in entry.findall('atom:author', ns):
                 name = author.find('atom:name', ns).text
                 authors.append(name)
+            
+            if len(authors) > 5:
+                authors = authors[:5] + ["et al."]
                 
             pdf_url = None
             for link in entry.findall('atom:link', ns):
