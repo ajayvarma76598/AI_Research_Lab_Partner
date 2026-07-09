@@ -53,7 +53,7 @@ def initialize_services():
 
     Mirrors demo-2-semantic-chunking-rag/rag-service.py: initialize_services().
     """
-    global _llm, _embed_model, _vector_store, _initialized
+    global _llm, _langchain_llm, _embed_model, _vector_store, _initialized
 
     if _initialized:
         logger.info("Services already initialized, reusing existing instances")
