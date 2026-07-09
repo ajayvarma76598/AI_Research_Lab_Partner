@@ -258,6 +258,7 @@ async def query_document_stream(request: QueryRequest, user: User = Depends(get_
     async def event_generator():
         try:
             final_state = None
+            accumulated_answer = ""
             async for event in graph.astream_events(initial_state, config, version="v1"):
                 kind = event["event"]
                 
@@ -265,6 +266,7 @@ async def query_document_stream(request: QueryRequest, user: User = Depends(get_
                 if kind == "on_chat_model_stream":
                     chunk = event["data"]["chunk"]
                     if chunk.content:
+                        accumulated_answer += chunk.content
                         yield f"event: message\ndata: {json.dumps({'content': chunk.content})}\n\n"
                 
                 # Capture the final state from the graph completion
@@ -278,7 +280,10 @@ async def query_document_stream(request: QueryRequest, user: User = Depends(get_
                 ]
                 processing_time_sec = round(time.time() - start_time, 2)
                 
-                final_answer = final_state.get("draft_answer", "")
+                final_answer = final_state.get("draft_answer")
+                if not final_answer:
+                    final_answer = accumulated_answer
+                    
                 if "INSUFFICIENT_CONTEXT" in final_answer:
                     final_answer = "I couldn't find any information about this in the provided text."
                 
