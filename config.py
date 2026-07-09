@@ -68,7 +68,7 @@ def initialize_services():
         api_key=os.getenv("AZURE_OPENAI_API_KEY"),
         azure_endpoint=os.getenv("AZURE_OPENAI_ENDPOINT"),
         api_version=os.getenv("AZURE_OPENAI_API_VERSION", "2024-02-15-preview"),
-        max_tokens=256,
+        max_tokens=2000,
         system_prompt="You are a helpful, human-like research assistant. Always provide answers in a natural, conversational, and humanized tone."
     )
 
@@ -84,7 +84,7 @@ def initialize_services():
         azure_deployment=os.getenv("AZURE_OPENAI_LLM_DEPLOYMENT"),
         api_version=os.getenv("AZURE_OPENAI_API_VERSION", "2024-02-15-preview"),
         temperature=0,
-        max_tokens=256
+        max_tokens=2000
     )
 
     # Assign to global Settings (same pattern as demo-2-semantic-chunking-rag)
