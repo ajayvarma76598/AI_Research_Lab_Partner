@@ -3,12 +3,6 @@ import { Brain } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 
 const ChatWindow = ({ messages, loading, messagesEndRef }) => {
-  const cleanContent = (text) => {
-    if (!text) return "";
-    // Remove ugly UUID chunk IDs like [d5fd4d47-d700-4ca8-8f25-29db61aefcca] from the text
-    return text.replace(/\[[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}\]/g, "");
-  };
-
   return (
     <div className="chat-window">
       {messages.length === 0 ? (
@@ -23,7 +17,7 @@ const ChatWindow = ({ messages, loading, messagesEndRef }) => {
             {m.role === 'human' || m.role === 'user' ? (
               m.content
             ) : (
-              <ReactMarkdown>{cleanContent(m.content)}</ReactMarkdown>
+              <ReactMarkdown>{m.content}</ReactMarkdown>
             )}
           </div>
         ))
