@@ -178,44 +178,41 @@ async def compare_documents_stream(request: CompareRequest, user: User = Depends
     
     async def event_generator():
         try:
-            final_state = None
-            async for event in graph.astream_events(initial_state, config, version="v1"):
-                kind = event["event"]
-                
-                if kind == "on_chat_model_stream":
-                    chunk = event["data"]["chunk"]
-                    if chunk.content:
-                        yield f"event: message\ndata: {json.dumps({'content': chunk.content})}\n\n"
-                
-                if kind == "on_chain_end" and event["name"] == "LangGraph":
-                    final_state = event["data"]["output"]
+            # Run the complex actor-critic loop completely in the background
+            # so we don't stream intermediate drafts or critic thoughts to the frontend
+            final_state = await graph.ainvoke(initial_state, config)
             
-            if final_state:
-                answer = final_state.get("draft_answer", "Error generating comparison.")
-                citations = [
-                    Citation(chunk_id=c["chunk_id"], page=c.get("page"), snippet_ref=c.get("chunk_type")).model_dump()
-                    for c in final_state.get("retrieved_chunks", [])
-                ]
-                processing_time_sec = round(time.time() - start_time, 2)
+            answer = final_state.get("draft_answer", "Error generating comparison.")
+            citations = [
+                Citation(chunk_id=c["chunk_id"], page=c.get("page"), snippet_ref=c.get("chunk_type")).model_dump()
+                for c in final_state.get("retrieved_chunks", [])
+            ]
+            processing_time_sec = round(time.time() - start_time, 2)
+            
+            metadata = {
+                "query_id": query_id,
+                "answer": answer,
+                "citations": citations,
+                "thread_id": thread_id,
+                "processing_time_sec": processing_time_sec,
+                "cached": False,
+            }
+            
+            cache_record = QueryCacheRecord(
+                query_hash=query_hash,
+                response_json=metadata
+            )
+            session.add(cache_record)
+            session.commit()
+            
+            # Now simulate streaming the final polished answer to the frontend
+            chunk_size = 20
+            for i in range(0, len(answer), chunk_size):
+                yield f"event: message\ndata: {json.dumps({'content': answer[i:i+chunk_size]})}\n\n"
+                await asyncio.sleep(0.01)
                 
-                metadata = {
-                    "query_id": query_id,
-                    "answer": answer,
-                    "citations": citations,
-                    "thread_id": thread_id,
-                    "processing_time_sec": processing_time_sec,
-                    "cached": False,
-                }
-                
-                cache_record = QueryCacheRecord(
-                    query_hash=query_hash,
-                    response_json=metadata
-                )
-                session.add(cache_record)
-                session.commit()
-                
-                yield f"event: metadata\ndata: {json.dumps(metadata)}\n\n"
-                
+            yield f"event: metadata\ndata: {json.dumps(metadata)}\n\n"
+            
         except Exception as e:
             logger.error(f"Compare streaming failed: {e}", exc_info=True)
             yield f"event: error\ndata: {json.dumps({'detail': str(e)})}\n\n"
