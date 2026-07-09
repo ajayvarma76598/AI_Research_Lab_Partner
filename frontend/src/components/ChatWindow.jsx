@@ -1,5 +1,6 @@
 import React from 'react';
 import { Brain } from 'lucide-react';
+import ReactMarkdown from 'react-markdown';
 
 const ChatWindow = ({ messages, loading, messagesEndRef }) => {
   return (
@@ -13,7 +14,11 @@ const ChatWindow = ({ messages, loading, messagesEndRef }) => {
       ) : (
         messages.map((m, i) => (
           <div key={i} className={`message ${m.role === 'human' || m.role === 'user' ? 'user' : 'ai'} animate-fade-in`}>
-            {m.content}
+            {m.role === 'human' || m.role === 'user' ? (
+              m.content
+            ) : (
+              <ReactMarkdown>{m.content}</ReactMarkdown>
+            )}
           </div>
         ))
       )}
