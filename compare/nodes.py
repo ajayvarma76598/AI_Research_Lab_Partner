@@ -72,7 +72,7 @@ def critique_node(state: CompareState) -> Dict[str, Any]:
     document_ids = state["document_ids"]
     
     # If there is no real draft, just pass
-    if "No relevant information" in draft_answer:
+    if "No relevant information" in draft_answer or "cannot answer" in draft_answer.lower():
         return {"is_satisfactory": True, "critique": "No context available to critique."}
         
     llm = get_langchain_llm()
