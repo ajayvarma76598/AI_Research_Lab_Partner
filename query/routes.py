@@ -34,16 +34,45 @@ def query_document(request: QueryRequest, user: User = Depends(get_current_user)
 
     query_hash = hashlib.sha256(f"{request.document_id}_{request.question}".encode()).hexdigest()
     
+    thread_id = request.thread_id or str(uuid.uuid4())
+    
     session = get_session()
     cached = session.query(QueryCacheRecord).filter_by(query_hash=query_hash).first()
     if cached:
         logger.info(f"Cache HIT for query '{request.question}'. Retrieving from QueryCacheRecord.")
-        session.close()
+        
+        # Ensure ChatSession exists
+        db_session = session.query(ChatSession).filter_by(thread_id=thread_id).first()
+        if not db_session:
+            doc = session.query(DocumentRecord).filter_by(document_id=request.document_id).first()
+            title = doc.title if doc else "New Chat"
+            new_chat = ChatSession(thread_id=thread_id, user_id=user.user_id, document_id=request.document_id, title=title)
+            session.add(new_chat)
+            session.commit()
+            
         response_data = cached.response_json
+        session.close()
+        
         processing_time_sec = round(time.time() - start_time, 2)
         response_data["processing_time_sec"] = processing_time_sec
         response_data["cached"] = True
-        response_data["query_id"] = query_id # Assign new query id for this request
+        response_data["query_id"] = query_id
+        response_data["thread_id"] = thread_id
+        
+        # Inject into LangGraph checkpointer manually so history works
+        from langchain_core.messages import HumanMessage, AIMessage
+        checkpointer = get_checkpointer()
+        config = {"configurable": {"thread_id": thread_id}}
+        state_tuple = checkpointer.get_tuple(config)
+        messages = []
+        if state_tuple and "messages" in state_tuple.checkpoint.get("channel_values", {}):
+            messages = state_tuple.checkpoint["channel_values"]["messages"]
+        
+        messages.append(HumanMessage(content=request.question))
+        messages.append(AIMessage(content=response_data.get("answer", "")))
+        
+        checkpointer.put(config, {"configurable": {"checkpoint_id": str(uuid.uuid4())}}, {"messages": messages}, {})
+        
         langfuse_context.update_current_trace(output=response_data)
         return QueryResponse(**response_data)
 
@@ -148,16 +177,44 @@ async def query_document_stream(request: QueryRequest, user: User = Depends(get_
 
     query_hash = hashlib.sha256(f"{request.document_id}_{request.question}".encode()).hexdigest()
     
+    thread_id = request.thread_id or str(uuid.uuid4())
+    
     session = get_session()
     cached = session.query(QueryCacheRecord).filter_by(query_hash=query_hash).first()
     if cached:
         logger.info(f"Cache HIT for query stream '{request.question}'. Retrieving from QueryCacheRecord.")
-        session.close()
+        
+        # Ensure ChatSession exists
+        db_session = session.query(ChatSession).filter_by(thread_id=thread_id).first()
+        if not db_session:
+            doc = session.query(DocumentRecord).filter_by(document_id=request.document_id).first()
+            title = doc.title if doc else "New Chat"
+            new_chat = ChatSession(thread_id=thread_id, user_id=user.user_id, document_id=request.document_id, title=title)
+            session.add(new_chat)
+            session.commit()
+            
         response_data = cached.response_json
+        session.close()
+        
         processing_time_sec = round(time.time() - start_time, 2)
         response_data["processing_time_sec"] = processing_time_sec
         response_data["cached"] = True
         response_data["query_id"] = query_id
+        response_data["thread_id"] = thread_id
+        
+        # Inject into LangGraph checkpointer manually so history works
+        from langchain_core.messages import HumanMessage, AIMessage
+        checkpointer = get_checkpointer()
+        config = {"configurable": {"thread_id": thread_id}}
+        state_tuple = checkpointer.get_tuple(config)
+        messages = []
+        if state_tuple and "messages" in state_tuple.checkpoint.get("channel_values", {}):
+            messages = state_tuple.checkpoint["channel_values"]["messages"]
+        
+        messages.append(HumanMessage(content=request.question))
+        messages.append(AIMessage(content=response_data.get("answer", "")))
+        
+        checkpointer.put(config, {"configurable": {"checkpoint_id": str(uuid.uuid4())}}, {"messages": messages}, {})
         
         async def cached_stream():
             answer = response_data.get('answer', '')
