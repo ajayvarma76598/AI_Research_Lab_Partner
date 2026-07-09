@@ -37,6 +37,7 @@ def query_document(request: QueryRequest, user: User = Depends(get_current_user)
     session = get_session()
     cached = session.query(QueryCacheRecord).filter_by(query_hash=query_hash).first()
     if cached:
+        logger.info(f"Cache HIT for query '{request.question}'. Retrieving from QueryCacheRecord.")
         session.close()
         response_data = cached.response_json
         processing_time_sec = round(time.time() - start_time, 2)
@@ -150,6 +151,7 @@ async def query_document_stream(request: QueryRequest, user: User = Depends(get_
     session = get_session()
     cached = session.query(QueryCacheRecord).filter_by(query_hash=query_hash).first()
     if cached:
+        logger.info(f"Cache HIT for query stream '{request.question}'. Retrieving from QueryCacheRecord.")
         session.close()
         response_data = cached.response_json
         processing_time_sec = round(time.time() - start_time, 2)

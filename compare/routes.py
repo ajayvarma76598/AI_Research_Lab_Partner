@@ -37,6 +37,7 @@ def compare_documents(request: CompareRequest, user: User = Depends(get_current_
     session = get_session()
     cached = session.query(QueryCacheRecord).filter_by(query_hash=query_hash).first()
     if cached:
+        logger.info(f"Cache HIT for compare query '{request.question}'. Retrieving from QueryCacheRecord.")
         session.close()
         response_data = cached.response_json
         processing_time_sec = round(time.time() - start_time, 2)
@@ -132,6 +133,7 @@ async def compare_documents_stream(request: CompareRequest, user: User = Depends
     session = get_session()
     cached = session.query(QueryCacheRecord).filter_by(query_hash=query_hash).first()
     if cached:
+        logger.info(f"Cache HIT for compare stream '{request.question}'. Retrieving from QueryCacheRecord.")
         session.close()
         response_data = cached.response_json
         processing_time_sec = round(time.time() - start_time, 2)

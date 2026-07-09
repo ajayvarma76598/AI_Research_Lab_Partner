@@ -68,6 +68,7 @@ def discover_literature(request: DiscoveryRequest, user: User = Depends(get_curr
         session = get_session()
         cached = session.query(DiscoveryCacheRecord).filter_by(query_hash=query_hash).first()
         if cached:
+            logger.info(f"Cache HIT for discovery query '{request.query}'. Retrieving from DiscoveryCacheRecord.")
             session.close()
             results = [DiscoveredPaper(**item) for item in cached.results_json]
             
