@@ -1,0 +1,55 @@
+# ============================================================================ 
+# Azure OpenAI (LLM + Embeddings) - matches your requiremnts.txt env vars 
+# ============================================================================ 
+LLM_PROVIDER=azure 
+AZURE_OPENAI_ENDPOINT=
+AZURE_OPENAI_API_VERSION=2024-02-01 
+AZURE_OPENAI_API_KEY=
+AZURE_OPENAI_LLM_DEPLOYMENT=gpt-4o-mini-for-finance 
+AZURE_OPENAI_LLM_MODEL=gpt-4o-mini 
+AZURE_OPENAI_EMBEDDING_DEPLOYMENT=text-embedding-3-small-finance 
+AZURE_OPENAI_EMBEDDING_MODEL=text-embedding-3-small 
+# ============================================================================ 
+# LlamaParse (used for PDF -> markdown text + table extraction) 
+# Get a key from https://cloud.llamaindex.ai/ 
+# ============================================================================ 
+LLAMA_CLOUD_API_KEY=
+# ============================================================================ 
+# PostgreSQL + pgvector 
+# ============================================================================ 
+DB_HOST=localhost
+DB_PORT=5432
+DB_NAME=Ai_research
+DB_USER=
+DB_PASSWORD=
+DB_TABLE_NAME=research_paper_chunks 
+# ============================================================================ 
+# Langfuse (observability + faithfulness/relevance/confidence scoring) 
+# ============================================================================ 
+LANGFUSE_SECRET_KEY=
+LANGFUSE_PUBLIC_KEY=
+LANGFUSE_BASE_URL="https://cloud.langfuse.com"
+# ============================================================================ 
+# Human handoff (SMTP) - triggered when SLOs are breached 
+# ============================================================================ 
+SMTP_HOST="smtp.gmail.com"
+SMTP_PORT=587 
+SMTP_USERNAME=
+SMTP_PASSWORD=
+APPLICATION_EMAIL=
+SUPPORT_EMAIL=
+# ============================================================================ 
+# SLO & handoff thresholds 
+# ============================================================================ 
+SLO_FAITHFULNESS_MIN=0.6 
+SLO_RELEVANCE_MIN=0.5 
+SLO_LATENCY_MAX_MS=5000 
+HANDOFF_FAITHFULNESS_THRESHOLD=0.6 
+HANDOFF_RELEVANCE_THRESHOLD=0.5 
+HANDOFF_CONFIDENCE_THRESHOLD=0.4 
+MAX_REFLECTION_ITERATIONS=3 
+# ============================================================================ 
+# Misc 
+# ============================================================================ 
+MAX_FILE_SIZE_MB=50
+PYTHONPATH=.

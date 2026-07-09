@@ -1,0 +1,195 @@
+import logging
+import uuid
+import time
+import hashlib
+import json
+from fastapi import APIRouter, HTTPException, Depends
+from fastapi.responses import StreamingResponse
+from models.schemas import CompareRequest, CompareResponse, Citation
+from auth.jwt import get_current_user, User
+from langfuse.decorators import observe, langfuse_context
+from compare.graph import build_compare_graph
+from db.models import get_session, QueryCacheRecord
+from observability.security import check_prompt_injection
+
+logger = logging.getLogger(__name__)
+router = APIRouter()
+
+@router.post("/compare", response_model=CompareResponse)
+@observe(as_type="trace")
+def compare_documents(request: CompareRequest, user: User = Depends(get_current_user)):
+    start_time = time.time()
+    query_id = f"cmp_{uuid.uuid4().hex[:8]}"
+
+    langfuse_context.update_current_trace(
+        name="compare",
+        input={"document_ids": request.document_ids, "question": request.question},
+    )
+
+    if check_prompt_injection(request.question):
+        raise HTTPException(status_code=403, detail="Blocked by Prompt Injection Firewall")
+
+    query_hash = hashlib.sha256(f"{sorted(request.document_ids)}_{request.question}".encode()).hexdigest()
+    
+    session = get_session()
+    cached = session.query(QueryCacheRecord).filter_by(query_hash=query_hash).first()
+    if cached:
+        session.close()
+        response_data = cached.response_json
+        processing_time_sec = round(time.time() - start_time, 2)
+        response_data["processing_time_sec"] = processing_time_sec
+        response_data["cached"] = True
+        response_data["query_id"] = query_id # Assign new query id for this request
+        langfuse_context.update_current_trace(output=response_data)
+        return CompareResponse(**response_data)
+
+    graph = build_compare_graph()
+    
+    initial_state = {
+        "query_id": query_id,
+        "document_ids": request.document_ids,
+        "question": request.question,
+        "retrieved_chunks": [],
+        "draft_answer": "",
+        "critique": "",
+        "is_satisfactory": False,
+        "iteration": 0,
+        "citations_count": 0
+    }
+    
+    try:
+        config = {"configurable": {"thread_id": query_id}}
+        result = graph.invoke(initial_state, config)
+    except Exception as e:
+        logger.error(f"Compare graph execution failed: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=f"Comparison failed: {str(e)}")
+
+    answer = result.get("draft_answer", "Error generating comparison.")
+    
+    citations = [
+        Citation(chunk_id=c["chunk_id"], page=c.get("page"), snippet_ref=c.get("chunk_type"))
+        for c in result.get("retrieved_chunks", [])
+    ]
+    
+    processing_time_sec = round(time.time() - start_time, 2)
+
+    langfuse_context.update_current_trace(output={
+        "answer": answer,
+        "citations_count": len(citations),
+        "iterations": result.get("iteration", 0),
+        "processing_time_sec": processing_time_sec
+    })
+
+    response = CompareResponse(
+        query_id=query_id,
+        answer=answer,
+        citations=citations,
+        processing_time_sec=processing_time_sec,
+        cached=False,
+    )
+    
+    # Save to cache
+    cache_record = QueryCacheRecord(
+        query_hash=query_hash,
+        response_json=response.model_dump()
+    )
+    session.add(cache_record)
+    session.commit()
+    session.close()
+
+    return response
+
+@router.post("/compare/stream")
+@observe(as_type="trace")
+async def compare_documents_stream(request: CompareRequest, user: User = Depends(get_current_user)):
+    start_time = time.time()
+    query_id = f"cmp_{uuid.uuid4().hex[:8]}"
+
+    langfuse_context.update_current_trace(
+        name="compare_stream",
+        input={"document_ids": request.document_ids, "question": request.question},
+    )
+
+    if check_prompt_injection(request.question):
+        raise HTTPException(status_code=403, detail="Blocked by Prompt Injection Firewall")
+
+    query_hash = hashlib.sha256(f"{sorted(request.document_ids)}_{request.question}".encode()).hexdigest()
+    
+    session = get_session()
+    cached = session.query(QueryCacheRecord).filter_by(query_hash=query_hash).first()
+    if cached:
+        session.close()
+        response_data = cached.response_json
+        processing_time_sec = round(time.time() - start_time, 2)
+        response_data["processing_time_sec"] = processing_time_sec
+        response_data["cached"] = True
+        response_data["query_id"] = query_id
+        
+        async def cached_stream():
+            yield f"event: message\ndata: {json.dumps({'content': response_data['answer']})}\n\n"
+            yield f"event: metadata\ndata: {json.dumps(response_data)}\n\n"
+        
+        return StreamingResponse(cached_stream(), media_type="text/event-stream")
+
+    graph = build_compare_graph()
+    
+    initial_state = {
+        "query_id": query_id,
+        "document_ids": request.document_ids,
+        "question": request.question,
+        "retrieved_chunks": [],
+        "draft_answer": "",
+        "critique": "",
+        "is_satisfactory": False,
+        "iteration": 0,
+        "citations_count": 0
+    }
+    
+    config = {"configurable": {"thread_id": query_id}}
+
+    async def event_generator():
+        try:
+            final_state = None
+            async for event in graph.astream_events(initial_state, config, version="v1"):
+                kind = event["event"]
+                
+                if kind == "on_chat_model_stream":
+                    chunk = event["data"]["chunk"]
+                    if chunk.content:
+                        yield f"event: message\ndata: {json.dumps({'content': chunk.content})}\n\n"
+                
+                if kind == "on_chain_end" and event["name"] == "LangGraph":
+                    final_state = event["data"]["output"]
+            
+            if final_state:
+                answer = final_state.get("draft_answer", "Error generating comparison.")
+                citations = [
+                    Citation(chunk_id=c["chunk_id"], page=c.get("page"), snippet_ref=c.get("chunk_type")).model_dump()
+                    for c in final_state.get("retrieved_chunks", [])
+                ]
+                processing_time_sec = round(time.time() - start_time, 2)
+                
+                metadata = {
+                    "query_id": query_id,
+                    "answer": answer,
+                    "citations": citations,
+                    "processing_time_sec": processing_time_sec,
+                    "cached": False,
+                }
+                
+                cache_record = QueryCacheRecord(
+                    query_hash=query_hash,
+                    response_json=metadata
+                )
+                session.add(cache_record)
+                session.commit()
+                
+                yield f"event: metadata\ndata: {json.dumps(metadata)}\n\n"
+                
+        except Exception as e:
+            logger.error(f"Compare streaming failed: {e}", exc_info=True)
+            yield f"event: error\ndata: {json.dumps({'detail': str(e)})}\n\n"
+        finally:
+            session.close()
+
+    return StreamingResponse(event_generator(), media_type="text/event-stream")
