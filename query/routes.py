@@ -3,6 +3,7 @@ import uuid
 import time
 import hashlib
 import json
+import asyncio
 from fastapi import APIRouter, HTTPException, Depends
 from fastapi.responses import StreamingResponse
 from models.schemas import QueryRequest, QueryResponse, Citation
@@ -157,7 +158,11 @@ async def query_document_stream(request: QueryRequest, user: User = Depends(get_
         response_data["query_id"] = query_id
         
         async def cached_stream():
-            yield f"event: message\ndata: {json.dumps({'content': response_data['answer']})}\n\n"
+            answer = response_data.get('answer', '')
+            chunk_size = 20
+            for i in range(0, len(answer), chunk_size):
+                yield f"event: message\ndata: {json.dumps({'content': answer[i:i+chunk_size]})}\n\n"
+                await asyncio.sleep(0.01)
             yield f"event: metadata\ndata: {json.dumps(response_data)}\n\n"
         
         return StreamingResponse(cached_stream(), media_type="text/event-stream")
