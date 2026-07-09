@@ -147,6 +147,19 @@ const Dashboard = () => {
     setMessages(prev => [...prev, { role: 'human', content: userMessage }]);
     setLoading(true);
 
+    let currentThreadId = activeSession;
+    let isNewSession = false;
+    if (!currentThreadId) {
+      currentThreadId = crypto.randomUUID();
+      setActiveSession(currentThreadId);
+      isNewSession = true;
+      setSessions(prev => [{
+        thread_id: currentThreadId,
+        title: "New Chat...",
+        updated_at: new Date().toISOString()
+      }, ...prev]);
+    }
+
     const api = await getApi();
     try {
       if (activeDocuments.length === 0) {
@@ -154,7 +167,7 @@ const Dashboard = () => {
         const payload = {
           query: userMessage,
           limit: 5,
-          thread_id: activeSession
+          thread_id: currentThreadId
         };
         const res = await api.post('/discover', payload);
         
@@ -170,15 +183,12 @@ const Dashboard = () => {
         
         setMessages(prev => [...prev, { role: 'ai', content: answer }]);
         
-        if (!activeSession && res.data.thread_id) {
-          setActiveSession(res.data.thread_id);
-          fetchSessions();
-        }
+        if (isNewSession) fetchSessions();
       } else if (activeDocuments.length === 1) {
         const payload = {
           document_id: activeDocuments[0],
           question: userMessage,
-          thread_id: activeSession
+          thread_id: currentThreadId
         };
         
         // Add placeholder AI message
@@ -231,10 +241,7 @@ const Dashboard = () => {
                     return newMsgs;
                   });
                 } else if (eventType === 'metadata') {
-                  if (!activeSession) {
-                    setActiveSession(data.thread_id);
-                    fetchSessions();
-                  }
+                  if (isNewSession) fetchSessions();
                 } else if (eventType === 'error') {
                   throw new Error(data.detail);
                 }
@@ -250,7 +257,7 @@ const Dashboard = () => {
         const payload = {
           document_ids: activeDocuments,
           question: userMessage,
-          thread_id: activeSession
+          thread_id: currentThreadId
         };
         
         // Add placeholder AI message
@@ -303,10 +310,7 @@ const Dashboard = () => {
                     return newMsgs;
                   });
                 } else if (eventType === 'metadata') {
-                  if (!activeSession && data.thread_id) {
-                    setActiveSession(data.thread_id);
-                    fetchSessions();
-                  }
+                  if (isNewSession) fetchSessions();
                 } else if (eventType === 'error') {
                   throw new Error(data.detail);
                 }
