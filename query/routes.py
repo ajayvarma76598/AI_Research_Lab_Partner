@@ -194,6 +194,8 @@ async def query_document_stream(request: QueryRequest, user: User = Depends(get_
         response_data = cached.response_json
         session.close()
         
+        logger.info(f"Retrieved Cached Answer (first 100 chars): {repr(response_data.get('answer', ''))[:100]}")
+        
         processing_time_sec = round(time.time() - start_time, 2)
         response_data["processing_time_sec"] = processing_time_sec
         response_data["cached"] = True
