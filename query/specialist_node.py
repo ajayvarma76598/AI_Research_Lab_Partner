@@ -75,7 +75,7 @@ def specialist_node(state: QueryState) -> dict:
         role_instruction=role_instruction,
         context=context,
         question=question
-    )
+    ) + "\n\nCRITICAL INSTRUCTION: You are a helpful, human-like research assistant. Always provide your final answer in a natural, conversational, and humanized tone."
 
     llm = get_langchain_llm()
     

@@ -57,7 +57,7 @@ def synthesizer_node(state: CompareState) -> Dict[str, Any]:
     
     llm = get_langchain_llm()
     lf_prompt = langfuse_client.get_prompt("compare_synthesizer")
-    prompt = lf_prompt.compile(question=question, context=combined_context)
+    prompt = lf_prompt.compile(question=question, context=combined_context) + "\n\nCRITICAL INSTRUCTION: You are a helpful, human-like research assistant. Always provide your final answer in a natural, conversational, and humanized tone."
     response = llm.invoke(prompt)
     draft_answer = response.content.strip()
     
@@ -123,7 +123,7 @@ def revision_node(state: CompareState) -> Dict[str, Any]:
     
     llm = get_langchain_llm()
     lf_prompt = langfuse_client.get_prompt("compare_revision")
-    prompt = lf_prompt.compile(question=question, context=combined_context, draft_answer=draft_answer, critique=critique)
+    prompt = lf_prompt.compile(question=question, context=combined_context, draft_answer=draft_answer, critique=critique) + "\n\nCRITICAL INSTRUCTION: You are a helpful, human-like research assistant. Always provide your final answer in a natural, conversational, and humanized tone."
     response = llm.invoke(prompt)
     revised_answer = response.content.strip()
     

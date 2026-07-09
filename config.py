@@ -68,7 +68,8 @@ def initialize_services():
         api_key=os.getenv("AZURE_OPENAI_API_KEY"),
         azure_endpoint=os.getenv("AZURE_OPENAI_ENDPOINT"),
         api_version=os.getenv("AZURE_OPENAI_API_VERSION", "2024-02-15-preview"),
-        max_tokens=256
+        max_tokens=256,
+        system_prompt="You are a helpful, human-like research assistant. Always provide answers in a natural, conversational, and humanized tone."
     )
 
     _embed_model = AzureOpenAIEmbedding(
