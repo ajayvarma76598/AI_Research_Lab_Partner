@@ -9,7 +9,9 @@ from models.schemas import CompareRequest, CompareResponse, Citation
 from auth.jwt import get_current_user, User
 from langfuse.decorators import observe, langfuse_context
 from compare.graph import build_compare_graph
-from db.models import get_session, QueryCacheRecord
+from db.models import get_session, QueryCacheRecord, ChatSession
+from db.checkpointer import get_checkpointer, get_async_checkpointer
+from langchain_core.messages import HumanMessage
 from observability.security import check_prompt_injection
 
 logger = logging.getLogger(__name__)
@@ -43,7 +45,16 @@ def compare_documents(request: CompareRequest, user: User = Depends(get_current_
         langfuse_context.update_current_trace(output=response_data)
         return CompareResponse(**response_data)
 
-    graph = build_compare_graph()
+    thread_id = request.thread_id or str(uuid.uuid4())
+    config = {"configurable": {"thread_id": thread_id}}
+    
+    db_session = session.query(ChatSession).filter_by(thread_id=thread_id).first()
+    if not db_session:
+        new_chat = ChatSession(thread_id=thread_id, user_id=user.user_id, document_id=None, title="Comparison")
+        session.add(new_chat)
+        session.commit()
+    
+    graph = build_compare_graph(get_checkpointer())
     
     initial_state = {
         "query_id": query_id,
@@ -54,7 +65,8 @@ def compare_documents(request: CompareRequest, user: User = Depends(get_current_
         "critique": "",
         "is_satisfactory": False,
         "iteration": 0,
-        "citations_count": 0
+        "citations_count": 0,
+        "messages": [HumanMessage(content=request.question)]
     }
     
     try:
@@ -85,6 +97,7 @@ def compare_documents(request: CompareRequest, user: User = Depends(get_current_
         answer=answer,
         citations=citations,
         processing_time_sec=processing_time_sec,
+        thread_id=thread_id,
         cached=False,
     )
     
@@ -131,7 +144,16 @@ async def compare_documents_stream(request: CompareRequest, user: User = Depends
         
         return StreamingResponse(cached_stream(), media_type="text/event-stream")
 
-    graph = build_compare_graph()
+    thread_id = request.thread_id or str(uuid.uuid4())
+    config = {"configurable": {"thread_id": thread_id}}
+    
+    db_session = session.query(ChatSession).filter_by(thread_id=thread_id).first()
+    if not db_session:
+        new_chat = ChatSession(thread_id=thread_id, user_id=user.user_id, document_id=None, title="Comparison")
+        session.add(new_chat)
+        session.commit()
+
+    graph = build_compare_graph(get_async_checkpointer())
     
     initial_state = {
         "query_id": query_id,
@@ -142,11 +164,11 @@ async def compare_documents_stream(request: CompareRequest, user: User = Depends
         "critique": "",
         "is_satisfactory": False,
         "iteration": 0,
-        "citations_count": 0
+        "citations_count": 0,
+        "messages": [HumanMessage(content=request.question)]
     }
     
-    config = {"configurable": {"thread_id": query_id}}
-
+    
     async def event_generator():
         try:
             final_state = None
@@ -173,6 +195,7 @@ async def compare_documents_stream(request: CompareRequest, user: User = Depends
                     "query_id": query_id,
                     "answer": answer,
                     "citations": citations,
+                    "thread_id": thread_id,
                     "processing_time_sec": processing_time_sec,
                     "cached": False,
                 }

@@ -38,7 +38,7 @@ class ChatSession(Base):
 
     thread_id = Column(String, primary_key=True) # Matches LangGraph thread_id
     user_id = Column(String, ForeignKey("users.user_id"), nullable=False)
-    document_id = Column(String, ForeignKey("documents.document_id"), nullable=False)
+    document_id = Column(String, ForeignKey("documents.document_id"), nullable=True)
     title = Column(String, default="New Chat")
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)

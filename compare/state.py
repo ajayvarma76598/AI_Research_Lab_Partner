@@ -1,6 +1,8 @@
-from typing import TypedDict, List, Dict, Any
+from typing import TypedDict, List, Dict, Any, Annotated
+from langgraph.graph.message import add_messages
 
 class CompareState(TypedDict):
+    messages: Annotated[list, add_messages]
     query_id: str
     document_ids: List[str]
     question: str

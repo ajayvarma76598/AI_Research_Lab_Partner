@@ -89,11 +89,13 @@ class CompareRequest(BaseModel):
     """Request model for POST /compare."""
     document_ids: List[str] = Field(..., description="List of document IDs to compare", min_length=2, max_length=5)
     question: str = Field(..., min_length=1, max_length=MAX_QUERY_LENGTH)
+    thread_id: Optional[str] = Field(default=None, description="Optional conversation thread ID")
 
 class CompareResponse(BaseModel):
     """Response model for POST /compare."""
     query_id: str
     answer: str
     citations: List[Citation] = []
+    thread_id: str
     processing_time_sec: float
     cached: bool = False

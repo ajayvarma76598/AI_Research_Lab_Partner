@@ -6,6 +6,7 @@ from query.retrieval import retrieve_chunks
 from compare.state import CompareState
 from langfuse.decorators import observe, langfuse_context
 from langfuse import Langfuse
+from langchain_core.messages import AIMessage
 
 langfuse_client = Langfuse()
 
@@ -61,7 +62,7 @@ def synthesizer_node(state: CompareState) -> Dict[str, Any]:
     response = llm.invoke(prompt)
     draft_answer = response.content.strip()
     
-    return {"draft_answer": draft_answer}
+    return {"draft_answer": draft_answer, "messages": [AIMessage(content=draft_answer)]}
 
 @observe(as_type="span", name="critique_node")
 def critique_node(state: CompareState) -> Dict[str, Any]:
@@ -129,5 +130,6 @@ def revision_node(state: CompareState) -> Dict[str, Any]:
     
     return {
         "draft_answer": revised_answer,
-        "iteration": state.get("iteration", 0) + 1
+        "iteration": state.get("iteration", 0) + 1,
+        "messages": [AIMessage(content=revised_answer)]
     }

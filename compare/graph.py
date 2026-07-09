@@ -22,7 +22,7 @@ def should_continue(state: CompareState) -> str:
     logger.info(f"CRITIC: Comparison rejected. Revising. (Iteration {state.get('iteration', 0)})")
     return "revise"
 
-def build_compare_graph():
+def build_compare_graph(checkpointer=None):
     builder = StateGraph(CompareState)
     
     builder.add_node("retriever", retriever_node)
@@ -45,5 +45,6 @@ def build_compare_graph():
     
     builder.add_edge("revision", "critique")
     
-    checkpointer = MemorySaver()
+    if checkpointer is None:
+        checkpointer = MemorySaver()
     return builder.compile(checkpointer=checkpointer)

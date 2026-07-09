@@ -153,7 +153,8 @@ const Dashboard = () => {
         // Discovery Mode
         const payload = {
           query: userMessage,
-          limit: 5
+          limit: 5,
+          thread_id: activeSession
         };
         const res = await api.post('/discover', payload);
         
@@ -168,6 +169,11 @@ const Dashboard = () => {
         });
         
         setMessages(prev => [...prev, { role: 'ai', content: answer }]);
+        
+        if (!activeSession && res.data.thread_id) {
+          setActiveSession(res.data.thread_id);
+          fetchSessions();
+        }
       } else if (activeDocuments.length === 1) {
         const payload = {
           document_id: activeDocuments[0],
@@ -243,7 +249,8 @@ const Dashboard = () => {
       } else {
         const payload = {
           document_ids: activeDocuments,
-          question: userMessage
+          question: userMessage,
+          thread_id: activeSession
         };
         
         // Add placeholder AI message
@@ -295,6 +302,11 @@ const Dashboard = () => {
                     newMsgs[newMsgs.length - 1].content = aiMessage;
                     return newMsgs;
                   });
+                } else if (eventType === 'metadata') {
+                  if (!activeSession && data.thread_id) {
+                    setActiveSession(data.thread_id);
+                    fetchSessions();
+                  }
                 } else if (eventType === 'error') {
                   throw new Error(data.detail);
                 }
