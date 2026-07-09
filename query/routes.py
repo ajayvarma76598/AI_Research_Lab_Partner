@@ -59,19 +59,17 @@ def query_document(request: QueryRequest, user: User = Depends(get_current_user)
         response_data["query_id"] = query_id
         response_data["thread_id"] = thread_id
         
-        # Inject into LangGraph checkpointer manually so history works
+        # Inject into LangGraph checkpointer cleanly so history works
         from langchain_core.messages import HumanMessage, AIMessage
-        checkpointer = get_checkpointer()
-        config = {"configurable": {"thread_id": thread_id}}
-        state_tuple = checkpointer.get_tuple(config)
-        messages = []
-        if state_tuple and "messages" in state_tuple.checkpoint.get("channel_values", {}):
-            messages = state_tuple.checkpoint["channel_values"]["messages"]
-        
-        messages.append(HumanMessage(content=request.question))
-        messages.append(AIMessage(content=response_data.get("answer", "")))
-        
-        checkpointer.put(config, {"configurable": {"checkpoint_id": str(uuid.uuid4())}}, {"messages": messages}, {})
+        graph = build_graph(get_checkpointer())
+        config = {"configurable": {"thread_id": thread_id, "checkpoint_ns": ""}}
+        try:
+            graph.update_state(config, {"messages": [
+                HumanMessage(content=request.question),
+                AIMessage(content=response_data.get("answer", ""))
+            ]})
+        except Exception as e:
+            logger.error(f"Failed to update graph state for cache hit: {e}")
         
         langfuse_context.update_current_trace(output=response_data)
         return QueryResponse(**response_data)
@@ -202,19 +200,17 @@ async def query_document_stream(request: QueryRequest, user: User = Depends(get_
         response_data["query_id"] = query_id
         response_data["thread_id"] = thread_id
         
-        # Inject into LangGraph checkpointer manually so history works
+        # Inject into LangGraph checkpointer cleanly so history works
         from langchain_core.messages import HumanMessage, AIMessage
-        checkpointer = get_checkpointer()
-        config = {"configurable": {"thread_id": thread_id}}
-        state_tuple = checkpointer.get_tuple(config)
-        messages = []
-        if state_tuple and "messages" in state_tuple.checkpoint.get("channel_values", {}):
-            messages = state_tuple.checkpoint["channel_values"]["messages"]
-        
-        messages.append(HumanMessage(content=request.question))
-        messages.append(AIMessage(content=response_data.get("answer", "")))
-        
-        checkpointer.put(config, {"configurable": {"checkpoint_id": str(uuid.uuid4())}}, {"messages": messages}, {})
+        graph = build_graph(get_checkpointer())
+        config = {"configurable": {"thread_id": thread_id, "checkpoint_ns": ""}}
+        try:
+            graph.update_state(config, {"messages": [
+                HumanMessage(content=request.question),
+                AIMessage(content=response_data.get("answer", ""))
+            ]})
+        except Exception as e:
+            logger.error(f"Failed to update graph state for cache hit: {e}")
         
         async def cached_stream():
             answer = response_data.get('answer', '')
