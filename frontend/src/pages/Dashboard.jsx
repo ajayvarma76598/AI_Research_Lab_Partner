@@ -205,7 +205,18 @@ const Dashboard = () => {
         });
 
         if (!response.ok) {
-          throw new Error('Server returned ' + response.status);
+          let errorDetail = 'Server returned ' + response.status;
+          try {
+            const errData = await response.json();
+            if (errData.detail) {
+              if (Array.isArray(errData.detail)) {
+                errorDetail = errData.detail[0].msg.replace("Value error, ", "");
+              } else {
+                errorDetail = errData.detail;
+              }
+            }
+          } catch (e) {}
+          throw new Error(errorDetail);
         }
 
         const reader = response.body.getReader();
@@ -274,7 +285,18 @@ const Dashboard = () => {
         });
 
         if (!response.ok) {
-          throw new Error('Server returned ' + response.status);
+          let errorDetail = 'Server returned ' + response.status;
+          try {
+            const errData = await response.json();
+            if (errData.detail) {
+              if (Array.isArray(errData.detail)) {
+                errorDetail = errData.detail[0].msg.replace("Value error, ", "");
+              } else {
+                errorDetail = errData.detail;
+              }
+            }
+          } catch (e) {}
+          throw new Error(errorDetail);
         }
 
         const reader = response.body.getReader();
