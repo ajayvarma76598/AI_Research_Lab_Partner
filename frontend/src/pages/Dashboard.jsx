@@ -324,7 +324,16 @@ const Dashboard = () => {
       }
     } catch (err) {
       console.error(err);
-      const errorMessage = err.response?.data?.detail || err.message || "Unknown error occurred.";
+      let errorMessage = "Unknown error occurred.";
+      if (err.response?.data?.detail) {
+        if (Array.isArray(err.response.data.detail)) {
+          errorMessage = err.response.data.detail[0].msg.replace("Value error, ", "");
+        } else {
+          errorMessage = err.response.data.detail;
+        }
+      } else if (err.message) {
+        errorMessage = err.message;
+      }
       setMessages(prev => [...prev, { role: 'ai', content: `Sorry, I encountered an error: ${errorMessage}` }]);
     } finally {
       setLoading(false);

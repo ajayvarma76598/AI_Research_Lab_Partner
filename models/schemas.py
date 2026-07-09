@@ -56,6 +56,8 @@ class QueryRequest(BaseModel):
     def validate_question(cls, v):
         if not v or not v.strip():
             raise ValueError("Question cannot be empty")
+        if len(v.strip().split()) < 3:
+            raise ValueError("Please frame your question as a complete sentence or phrase (at least 3 words).")
         return v.strip()
 
 
@@ -90,6 +92,15 @@ class CompareRequest(BaseModel):
     document_ids: List[str] = Field(..., description="List of document IDs to compare", min_length=2, max_length=5)
     question: str = Field(..., min_length=1, max_length=MAX_QUERY_LENGTH)
     thread_id: Optional[str] = Field(default=None, description="Optional conversation thread ID")
+
+    @field_validator("question")
+    @classmethod
+    def validate_question(cls, v):
+        if not v or not v.strip():
+            raise ValueError("Question cannot be empty")
+        if len(v.strip().split()) < 3:
+            raise ValueError("Please frame your question as a complete sentence or phrase (at least 3 words).")
+        return v.strip()
 
 class CompareResponse(BaseModel):
     """Response model for POST /compare."""
